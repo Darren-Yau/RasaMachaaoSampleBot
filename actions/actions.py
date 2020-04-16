@@ -9,8 +9,21 @@
 
 from typing import Any, Text, Dict, List
 
+import requests
+import json
+import yaml
 from rasa_sdk import Action, Tracker
 from rasa_sdk.executor import CollectingDispatcher
+
+
+base_url = ""
+api_token = ""
+
+with open("credentials.yml") as file:
+    credentials = yaml.load(file, Loader=yaml.FullLoader)
+    base_url = credentials["MachaaoConnector.MachaaoInputChannel"]["base_url"]
+    api_token = credentials["MachaaoConnector.MachaaoInputChannel"]["api_token"]
+    file.close()
 
 class ActionSendText(Action):
 
@@ -48,7 +61,7 @@ class ActionSendCarousel(Action):
 
         elements = [{"title": "Sample Title 1",
                     "subtitle": "Sample Subtitle 1",
-                     "image_url": "https://i.imgur.com/nGF1K8f.jpg" 
+                     "image_url": "https://i.imgur.com/nGF1K8f.jpg"
                      },
                     {
                         "title": "Sample Title 2",
@@ -80,3 +93,58 @@ class ActionSendButtons(Action):
         dispatcher.utter_button_message(text, buttons)
         return []
 
+
+def add_or_remove_tag(sender_id:str,on_off:int) -> None:
+    """
+    :param sender_id: Used to specify which user to tag. You can get this from tracker
+    :param on_off: activate tags by passing 1, deactivate by passing 0
+    :return:
+    """
+
+    tag = "Your-Tag-Name"
+    display_name = "Your Display Name"
+    API_ENDPOINT = base_url + "/v1/users/tag/" + sender_id
+
+    print("Tag ENDPOINT")
+    print(API_ENDPOINT)
+
+    headers = {
+        "api_token": api_token,
+        "Content-Type": "application/json"
+    }
+    payload = {
+            "tag": tag,
+            "source": "firebase",
+            "status": on_off,
+            "displayName": display_name
+    }
+
+    requests.post(url=API_ENDPOINT, data=json.dumps(payload), headers=headers)
+    return None
+
+
+def send_announcement(tag:str,message:str) -> None:
+    """
+    :param tag: Specifies which subset of users you would like to message
+    :param message: The message you would like to send
+    :return:
+    """
+
+    API_ENDPOINT = base_url + "/v1/messages/announce"
+
+    headers = {
+        "api_token": api_token,
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "tags": [tag],
+        "identifier": "BROADCAST_FB_TEMPLATE_GENERIC",
+        "notificationType": "REGULAR",
+        "source": "firebase",
+        "message": {
+            "text": message
+        }
+    }
+    requests.post(url=API_ENDPOINT, data=json.dumps(payload), headers=headers)
+    return None
